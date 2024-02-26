@@ -1,7 +1,5 @@
-import tkinter as tk
+import tkinter as tk, os, csv, subprocess, re, tkinter.messagebox as messagebox, aspose.pdf as ap
 from tkinter import filedialog
-import aspose.pdf as ap
-import os
 
 # Global variables for color palette
 light_mode = True
@@ -9,10 +7,9 @@ light_background_color = "#747474"
 light_sub_background_color = "#B1B1B1"
 light_text_color = "#0A0708"
 light_entry_color = "#FFFFFF"
-dark_background_color = "#1e1e1e"
-dark_sub_background_color = "#252526"
-dark_text_color = "#9AC5F4"
-dark_entry_color = "#3e3e42"
+dark_background_color = "#2f3136"
+dark_sub_background_color = "#40444b"
+dark_text_color = "#FFFFFF"
 
 # Function to toggle between light mode and dark mode
 def toggle_mode():
@@ -34,14 +31,14 @@ def toggle_mode():
         # Dark Mode
         window.configure(bg=dark_background_color)
         input_pdf_label.configure(bg=dark_background_color, fg=dark_text_color)
-        input_pdf_entry.configure(bg=dark_entry_color, fg=dark_text_color)
+        input_pdf_entry.configure(bg=dark_sub_background_color, fg=dark_text_color)
         input_pdf_button.configure(bg=dark_sub_background_color, fg=dark_text_color)
         output_csv_label.configure(bg=dark_background_color, fg=dark_text_color)
-        output_csv_entry.configure(bg=dark_entry_color, fg=dark_text_color)
+        output_csv_entry.configure(bg=dark_sub_background_color, fg=dark_text_color)
         output_csv_button.configure(bg=dark_sub_background_color, fg=dark_text_color)
         store_button.configure(bg=dark_sub_background_color, fg=dark_text_color)
         convert_button.configure(bg=dark_sub_background_color, fg=dark_text_color)
-        log_text.configure(bg=dark_entry_color, fg=dark_text_color)
+        log_text.configure(bg=dark_sub_background_color, fg=dark_text_color)
 
 # Converting .pdf to .csv
 def convert_to_csv():
@@ -52,15 +49,48 @@ def convert_to_csv():
         document = ap.Document(input_pdf)
         save_option = ap.ExcelSaveOptions()
         save_option.format = ap.ExcelSaveOptions.ExcelFormat.CSV
-        print(type(save_option))
+
+        # Check if the output CSV file already exists
+        if os.path.exists(output_csv):
+            response = messagebox.askquestion("File Exists", "A file with the same name already exists. Do you want to replace it?")
+            if response == 'no':
+                # Ask the user for a new filename
+                new_filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
+                if new_filename:
+                    output_csv = new_filename
+                else:
+                    log_text.insert(tk.END, "Operation cancelled by the user.\n")
+                    log_text.see(tk.END)
+                    return
+            elif response == 'yes':
+                pass  # Proceed with the conversion and overwrite the existing file
+        else:
+            pass  # Output file does not exist, proceed with the conversion
+
         document.save(output_csv, save_option)
 
-        # Extract file names
-        pdf_name = os.path.basename(input_pdf)
-        csv_name = os.path.basename(output_csv)
+        # Open the CSV file, search and remove rows with the specified string, and display it
+        with open(output_csv, 'r', newline='') as file:
+            csv_reader = csv.reader(file)
+            rows = [row for row in csv_reader if not re.search(r"Evaluation Only\. Created with Aspose\.PDF\. Copyright 2002-\d{4} Aspose Pty Ltd\.", ','.join(row))]
 
-        log_text.insert(tk.END, f"Conversion completed successfully.\nPDF File: {pdf_name}\nCSV File: {csv_name}\n")
-        log_text.see(tk.END)
+        with open(output_csv, 'w', newline='') as file:
+            csv_writer = csv.writer(file)
+            csv_writer.writerows(rows)
+
+        # Open the modified CSV file for the user
+        if os.path.exists(output_csv):
+            subprocess.Popen(['start', '', output_csv], shell=True)  # Windows
+
+            # Extract file names
+            pdf_name = os.path.basename(input_pdf)
+            csv_name = os.path.basename(output_csv)
+
+            log_text.insert(tk.END, f"Conversion completed successfully.\nPDF File: {pdf_name}\nCSV File: {csv_name}\n")
+            log_text.see(tk.END)
+        else:
+            log_text.insert(tk.END, f"Error: Output CSV file not found.\n")
+            log_text.see(tk.END)
     else:
         log_text.insert(tk.END, "Please provide both input and output file paths.\n")
         log_text.see(tk.END)
